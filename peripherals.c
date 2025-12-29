@@ -26,48 +26,32 @@ void GlobalINT(void) // Global Interrupt enable
 
 void UART_ISR(void) interrupt 4 // ISR
 {
-    uint8_t rx_char;
-    uint8_t parsed_val = 0xFF; 
-    uint8_t i;
+    
+    uint8_t tempsnew = 0xFF; 
+	  int s_rangefillter;
 
     if (RI)
     {
         RI = 0;
-        rx_char = SBUF;
-
-        // Filter Convert ASCII char to hexa
-        if (rx_char >= '0' && rx_char <= '9')      
+        tempsnew = SBUF;
+		    s_rangefillter= hexCharToInt(tempsnew);
+        if (s_rangefillter != -1)
         {
-            parsed_val = rx_char - '0';
-        }
-        else
-					if (rx_char >= 'A' && rx_char <= 'F') 
-        {
-            parsed_val = rx_char - 'A' + 10;
-        }
-
-        
-        if (parsed_val != 0xFF)
-        {
-            Snew = parsed_val; 
-
-            if (buffer_count < MAX_PACKETS)
+            Snew = s_rangefillter; 
+            if (buffer_count < Max_in_for_outpins)
             {
-                                    
-                for (i = 0; i < HAMMING_R; i++)
-                {
-                    S_stream_expanded[(buffer_count * HAMMING_R) + i] = 
-                        (parsed_val >> (HAMMING_R - 1 - i)) & 0x01;// split the number in binary to 4 Bytes in buffer
-                }
-                
-                buffer_count++;
-                
-                if (buffer_count == 1) // only one char make interrupt
-                {
-                    buffer_flag = 1;
-                }
+                buffer_flag = ProcessRxData(Snew);
             }
         }
     }
     if (TI) TI = 0; 
+
+}
+void Port_Init(void)
+{
+    // Port 2: P2.0-P2.7 as outputs (8 bits)
+    P2 = 0x00;
+    
+    // Port 3: P3.5-P3.7 as outputs (3 bits)
+    P3 = P3 & 0x0F;  // Clear upper nibble, preserve lower
 }
