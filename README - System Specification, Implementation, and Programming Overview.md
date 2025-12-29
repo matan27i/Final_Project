@@ -1,8 +1,14 @@
 Secure Low-Power Bus Encoder & Attack-Resistant Architecture | Final Project 
+
 • Architected and implemented a novel Bus Encoding algorithm on Xilinx Artix-7 FPGA to minimize switching activity and reduce dynamic power dissipation on high-capacitance off-chip buses.. 
+
 • Developed a Hardware-Software Co-design verification environment, interfacing a Python-based controller with the FPGA via UART for real-time performance validation. 
+
 • Conducted rigorous power analysis using hands – on hardware experiments and Vivado Power Analyzer,demonstrating a measurable reduction in Hamming Distance and switching noise. 
+
 • Optimized RTL code for resource utilization (LUTs/Flip-Flops) and achieved successful timing closure at target operating frequencies. 
+
+
 System Architecture
 Microcontroller: ADuC841 (High-Performance 8052 Core).
 
