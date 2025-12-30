@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   PERIPHERALS                                                       12/30/2025 12:11:57 PAGE 1   
+C51 COMPILER V9.60.7.0   PERIPHERALS                                                       12/30/2025 12:35:43 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE PERIPHERALS
@@ -43,16 +43,27 @@ line level    source
   33   2          }
   34   1        if (TI) TI = 0;
   35   1      }
+  36          
+  37          void Port_Init(void)
+  38          {
+  39   1          // Port 2: P2.0-P2.7 as outputs (8 bits)
+  40   1          P2 = 0x00;
+  41   1          
+  42   1          // Port 3: P3.5-P3.7 as outputs (3 bits)
+  43   1          P3 = P3 & 0x0F;  // Clear upper nibble, preserve lower
+  44   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =     42    ----
+   CODE SIZE        =     49    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
+C51 COMPILER V9.60.7.0   PERIPHERALS                                                       12/30/2025 12:35:43 PAGE 2   
+
 END OF MODULE INFORMATION.
 
 

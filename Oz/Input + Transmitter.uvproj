@@ -401,6 +401,11 @@
               <FileType>1</FileType>
               <FilePath>.\tx_handler.c</FilePath>
             </File>
+            <File>
+              <FileName>transmitter_out.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\transmitter_out.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

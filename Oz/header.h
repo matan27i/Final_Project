@@ -33,5 +33,7 @@ void GlobalINT(void);
 void tx_handler(uint8_t rx_char);
 uint8_t get_X_from_S(const uint8_t *S_vector, uint8_t hamming_R, uint8_t *X_output);
 uint8_t get_multi_X_from_S(const uint8_t *S_stream, const uint8_t *R_list, uint8_t packet_count, uint8_t *X_stream);
+void Port_Init(void);
+void transmit_X_to_bus(const uint8_t *X_stream_output);
 
 #endif
