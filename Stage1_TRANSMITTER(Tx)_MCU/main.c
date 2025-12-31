@@ -25,6 +25,7 @@ void main(void)
     GlobalINT();
     Timer3_Init();
     UART_Init();
+	  Port_Init();
     
  
     while(1)
