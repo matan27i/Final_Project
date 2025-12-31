@@ -33,3 +33,11 @@ void UART_ISR(void) interrupt 4 // ISR
     }
 	if (TI) TI = 0;
 }
+void Port_Init(void)
+{
+    // Port 2: P2.0-P2.7 as outputs (8 bits)
+    P2 = 0x00;
+    
+    // Port 3: P3.5-P3.7 as outputs (3 bits)
+    P3 = P3 & 0x0F;  // Clear upper nibble, preserve lower
+}
