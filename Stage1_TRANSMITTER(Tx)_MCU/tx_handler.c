@@ -50,7 +50,7 @@ void tx_handler(uint8_t tx_char)
             // and store it as a separate byte in the expanded array.
             for (i = 0; i < HAMMING_R; i++)
             {
-                // Calculate the linear index in the global xdata array
+                // Calculate the linear index in the global idata array
                 index = (buffer_count * HAMMING_R) + i;
                 
                 // Logic:

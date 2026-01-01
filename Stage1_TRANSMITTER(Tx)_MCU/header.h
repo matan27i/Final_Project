@@ -9,7 +9,7 @@ typedef unsigned char uint8_t;
 // --- 2. Hamming & Buffer Constants ---
 #define HAMMING_R    4                  // Number of parity bits (R)
 #define HAMMING_N    ((1 << HAMMING_R) - 1) // Block length (N=15)
-#define MAX_PACKETS  10                 // Max input characters to buffer
+#define MAX_PACKETS  3                // Max input characters to buffer
 
 // --- 3. Global Variables (Externs) ---
 // Flags & Status
@@ -20,8 +20,8 @@ extern volatile uint8_t Snew;           // Last parsed hex value
 
 // Data Storage
 extern volatile uint8_t tx_temp_byte;   // Raw byte from ISR
-// Expanded bit stream in external memory (xdata)
-extern volatile uint8_t xdata S_stream_expanded[MAX_PACKETS * HAMMING_R];
+// Expanded bit stream in external memory (idata)
+extern volatile uint8_t idata S_stream_expanded[MAX_PACKETS * HAMMING_R];
 
 // --- 4. Function Prototypes ---
 // Hardware Initialization

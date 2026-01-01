@@ -41,7 +41,7 @@ def send_hex_to_mcu(hex_list, port='COM5', baudrate=9600):
         ser.write(message_string.encode('utf-8'))
 
         # אופציונלי: הוספת תו ירידת שורה אם הבקר שלך מצפה לזה בסוף
-        # ser.write(b'\n') 
+        ser.write(b'\n')
 
         print("Done sending.")
         ser.close()
@@ -54,7 +54,7 @@ def send_hex_to_mcu(hex_list, port='COM5', baudrate=9600):
 # --- Main ---
 if __name__ == "__main__":
 
-    raw_syndrome = [1, 0, 1,0]
+    raw_syndrome = [1,0,1,1]
 
 
     hex_result = convert_bits_to_hex_symbols(raw_syndrome)

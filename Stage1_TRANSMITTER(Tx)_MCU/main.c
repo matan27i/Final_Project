@@ -9,14 +9,14 @@ volatile bit buffer_flag = 0;
 volatile bit tx_flag = 0;
 volatile uint8_t tx_temp_byte = 0;
 
-// Must be xdata to fit in memory
-volatile uint8_t xdata S_stream_expanded[MAX_PACKETS * 4]; 
+// Must be idata to fit in memory
+volatile uint8_t idata S_stream_expanded[MAX_PACKETS * 4]; 
 
-// Output Buffer xdata
-uint8_t xdata X_stream_output[MAX_PACKETS * HAMMING_N];
+// Output Buffer idata
+uint8_t idata X_stream_output[MAX_PACKETS * HAMMING_N];
 
 //uint8_t R_config_list[MAX_PACKETS];
-uint8_t R_config_list[] = {4,3};
+uint8_t R_config_list[] = {4};
 
 void main(void)
 {
