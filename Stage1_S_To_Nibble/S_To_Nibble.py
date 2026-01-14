@@ -1,8 +1,7 @@
 import serial
 import time
 
-
-# --- הפונקציה שלך (ללא שינוי) ---
+# --- הפונקציה שלך  ---
 def convert_bits_to_hex_symbols(bits):
     hex_symbols = []
     for i in range(0, len(bits), 4):
