@@ -15,7 +15,7 @@ def convert_bits_to_hex_symbols(bits):
         for bit in chunk:
             val = (val << 1) | bit
 
-        hex_symbols.append(f'{val:X}')
+        
 
     return hex_symbols
 # --- בדיקה ---
