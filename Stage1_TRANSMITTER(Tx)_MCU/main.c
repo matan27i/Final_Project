@@ -49,7 +49,6 @@ void main(void)
             transmit_X_to_bus(X_stream_output); // Send output to bus
             buffer_count = 0;// Reset buffer
             
-            buffer_count = 0; // Reset counter
             ES = 1; // Re-enable serial interrupt
         }
     }

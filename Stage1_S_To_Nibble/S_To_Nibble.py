@@ -2,64 +2,49 @@ import serial
 import time
 
 
-def convert_bits_to_hex_symbols(bits):
-    hex_symbols = []
-    for i in range(0, len(bits), 4):
-        chunk = bits[i: i + 4]
-        while len(chunk) < 4:
-            chunk.append(0)
-        val = 0
-        for bit in chunk:
-            val = (val << 1) | bit
-        hex_symbols.append(f'{val:X}')
-    return hex_symbols
+def send_value_as_nibbles():
+    port = 'COM5'
+    baudrate = 9600
 
-
-def send_hex_to_mcu(hex_list, port='COM5', baudrate=9600):
     try:
-        print(f"Connecting to {port}...")
-        ser = serial.Serial(port, baudrate, timeout=1)
-        time.sleep(2)
-        message_string = "".join(hex_list)
-        print(f"Sending string: {message_string}")
-        ser.write(message_string.encode('utf-8'))
-        print("Done sending.")
-        ser.close()
+        # פתיחת הפורט פעם אחת בלבד
+        with serial.Serial(port, baudrate, timeout=1) as ser:
+            print(f"Connected to {port}. Initializing...")
+            time.sleep(2)
+
+            user_input = input("Enter a value (Decimal 0-4095 or Hex 0-F): ").strip()
+
+            try:
+                # 1. המרה לערך הקסדצימלי (ללא ה-0x) באותיות גדולות
+                if user_input.startswith(('0x', '0X')):
+                    hex_str = user_input[2:].upper()
+                elif user_input.isdigit():
+                    hex_str = f"{int(user_input):X}"
+                else:
+                    hex_str = user_input.upper()
+
+                # 2. בדיקת מגבלת ה-Buffer של ה-MCU (MAX_PACKETS = 3)
+                if len(hex_str) > 3:
+                    print("Warning: Input exceeds MAX_PACKETS (3). Only the first 3 nibbles will be processed.")
+                    hex_str = hex_str[:3]
+
+                # 3. שליחת כל ניבל כתו ASCII
+                for char in hex_str:
+                    if char in "0123456789ABCDEF":
+                        print(f"Sending Nibble: {char}")
+                        ser.write(char.encode('ascii'))
+                        time.sleep(0.1)  # השהייה לעיבוד ה-ISR ב-MCU
+
+                # 4. שליחת תו סוף שורה להפעלת ה-buffer_flag
+                ser.write(b'\n')
+                print("Transmission complete (Newline sent).")
+
+            except ValueError:
+                print("Invalid input. Please enter a number or a hex string.")
+
     except serial.SerialException as e:
-        print(f"Error opening serial port: {e}")
+        print(f"Serial Error: {e}")
 
 
-def get_user_input_as_syndromes():
-    user_text = input("Please enter text (press Enter to send): ")
-    user_text += '\n'
-    all_syndromes = []
-
-    print(f"\nProcessing input: '{user_text.strip()}' + Enter")
-
-    for char in user_text:
-        ascii_val = ord(char)
-        # 2. המרה לבינארי
-        bin_str = f'{ascii_val:08b}'
-        # 3. המרה לרשימה של מספרים
-        bits = [int(b) for b in bin_str]
-        all_syndromes.append(bits)
-
-    return all_syndromes
-
-
-# --- Main ---
 if __name__ == "__main__":
-    # 1. קבלת הקלט מהמשתמש (רשימה של רשימות ביטים)
-    syndromes_list = get_user_input_as_syndromes()
-    # 2. מעבר על כל "סינדרום" (תו) ושליחתו
-    for p, raw_syndrome in enumerate(syndromes_list):
-        print(f"--- Processing Character {p + 1} ---")
-        print(f"Bits: {raw_syndrome}")
-        # המרה להקס
-        hex_result = convert_bits_to_hex_symbols(raw_syndrome)
-        print(f"Converted to Hex: {hex_result}")
-        # שליחה למיקרו-בקר
-        #  שולח תו אחרי תו
-        send_hex_to_mcu(hex_result, port='COM5', baudrate=9600)
-        # השהייה קטנה בין תווים
-        time.sleep(0.1)
+    send_value_as_nibbles()
