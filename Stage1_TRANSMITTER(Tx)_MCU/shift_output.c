@@ -1,37 +1,55 @@
 /* File: shift_output.c
  * Shift Register Output Driver for H1-Type Bus Encoder
  * Target: ADuC841 (8052 single-cycle core, 11.0592 MHz typical)
+ * Shift Register: SN74HC595 (8-bit serial-in, parallel-out with output latches)
+ *
+ * 74HC595 PIN CONNECTIONS:
+ *   SER_PIN   (P2.0) -> SER (pin 14)   - Serial data input
+ *   SRCLK_PIN (P2.1) -> SRCLK (pin 11) - Shift register clock
+ *   RCLK_PIN  (P2.2) -> RCLK (pin 12)  - Storage register clock (latch)
+ *   SRCLR_PIN (P2.3) -> SRCLR (pin 10) - Shift register clear (keep HIGH)
+ *   OE_PIN    (P2.4) -> OE (pin 13)    - Output enable (keep LOW)
+ *   
+ *   Note: SRCLR and OE can be hardwired (SRCLR to VCC, OE to GND) to save GPIOs.
+ *   For cascading: QH' (pin 9) of first chip -> SER of second chip
  *
  * BIT MAPPING AND SHIFT ORDER:
  * H column index i (1..15) maps to bit position (i-1) in current_bus_state.
  * 
- *   Bit 0  <=> Column 1  <=> first physical shift register output
- *   Bit 1  <=> Column 2
+ *   Bit 0  <=> Column 1  <=> QA of first 74HC595
+ *   Bit 1  <=> Column 2  <=> QB of first 74HC595
  *   ...
- *   Bit 14 <=> Column 15 <=> last physical shift register output
+ *   Bit 7  <=> Column 8  <=> QH of first 74HC595
+ *   Bit 8  <=> Column 9  <=> QA of second 74HC595
+ *   ...
+ *   Bit 14 <=> Column 15 <=> QG of second 74HC595
  *
  * Shift order: MSB-first (bit 14 down to bit 0).
- * This means column 15 is shifted out first, and column 1 is shifted out last.
- * After latching, bit 0 (column 1) appears at Q0 of the first shift register
- * in the chain, and bit 14 (column 15) appears at Q6 of the second shift register
- * (assuming 8-bit shift registers, 15 bits = 2 registers).
+ * First bit shifted ends up at QH of second chip, last bit at QA of first chip.
+ *
+ * 74HC595 TIMING (from datasheet @ VCC=4.5V):
+ *   - fmax (SRCLK): 25 MHz
+ *   - tsu (SER before SRCLK↑): 25 ns min
+ *   - th (SER after SRCLK↑): 0 ns
+ *   - tsu (SRCLK↑ before RCLK↑): 19 ns min
+ *   - tw (SRCLK/RCLK high or low): 20 ns min
  *
  * CLK TIMING ANALYSIS:
-
- * Target CLK frequency: ~1 MHz
+ *
+ * Target CLK frequency: ~100 kHz (conservative, well within 74HC595 specs)
  * 
  * ADuC841 with 11.0592 MHz crystal:
  *   - Single-cycle core: 1 instruction cycle = 1 / 11.0592 MHz ≈ 90.4 ns
- *   - For 0.5 µs delay: need ~5-6 instruction cycles
+ *   - For 5 µs delay (100 kHz half-period): need ~55 instruction cycles
  *
  * NOP-based delay calibration:
  *   - Each _nop_() is 1 cycle ≈ 90 ns
- *   - 5 NOPs ≈ 450 ns, 6 NOPs ≈ 540 ns
- *   - Use 5 NOPs for each half-period to achieve ~1 MHz CLK
+ *   - 55 NOPs ≈ 4.95 µs ≈ 5 µs
+ *   - Use 55 NOPs for each half-period to achieve ~100 kHz CLK
  *
  * TO ADAPT TIMING FOR DIFFERENT CPU CLOCKS:
- *   - For 22.1184 MHz: double the NOPs (10 per half-period)
- *   - For 5.5296 MHz: halve the NOPs (2-3 per half-period)
+ *   - For 22.1184 MHz: double the NOPs (110 per half-period)
+ *   - For 5.5296 MHz: halve the NOPs (27-28 per half-period)
  *   - Formula: NOPs ≈ (desired_delay_ns / 90) - instruction_overhead
  *
  */
@@ -42,28 +60,38 @@
 
 /* NOP delay macros for CLK timing
  * Assuming 11.0592 MHz CPU, each NOP ≈ 90 ns
- * Target: 5 NOPs ≈ 450 ns delay for ~1 MHz CLK
+ * Target: 55 NOPs ≈ 5 µs delay for ~100 kHz CLK
+ * (100 kHz = 10 µs period, 5 µs per half-period)
  */
 #define CLK_DELAY_NOPS() do { \
+    _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
+    _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
+    _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
+    _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
+    _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
     _nop_(); _nop_(); _nop_(); _nop_(); _nop_(); \
 } while(0)
 
 /* output_to_shift_registers
- * Bit-bangs current_bus_state (15 bits) to chained shift registers.
+ * Bit-bangs current_bus_state (15 bits) to chained 74HC595 shift registers.
  *
- * Protocol sequence:
- * 1. Pull LATCH_PIN low (prepare for shifting)
- * 2. For bit = 14 down to 0 (MSB-first):
- *    a. Set DATA_PIN to ((current_bus_state >> bit) & 1)
- *    b. Pulse CLK_PIN high for ~0.5 µs
- *    c. Pulse CLK_PIN low for ~0.5 µs
- * 3. Pulse LATCH_PIN high to transfer shift register contents to outputs
+ * 74HC595 Pin Mapping:
+ *   SER_PIN   -> SER (pin 14)   - Serial data input
+ *   SRCLK_PIN -> SRCLK (pin 11) - Shift register clock (rising edge triggered)
+ *   RCLK_PIN  -> RCLK (pin 12)  - Storage register clock (rising edge triggered)
+ *
+ * Protocol sequence (per 74HC595 datasheet):
+ * 1. For each bit (MSB-first, bit 14 down to bit 0):
+ *    a. Set SER_PIN to the bit value
+ *    b. Pulse SRCLK_PIN high then low - data shifts on rising edge
+ * 2. After all bits shifted, pulse RCLK_PIN high then low
+ *    - This transfers shift register contents to output latches on rising edge
+ *
+ * Note: RCLK and SRCLK are independent. RCLK doesn't need to be held low
+ * during shifting - only the rising edge matters for latching.
  *
  * Interrupt safety: Disables interrupts during bit-bang to ensure timing
  * consistency and atomic bus state output. Re-enables after completion.
- *
- * Reentrant safety: Protected by interrupt disable. Not truly reentrant,
- * but safe in single-threaded context with ISRs disabled.
  */
 void output_to_shift_registers(void)
 {
@@ -79,49 +107,66 @@ void output_to_shift_registers(void)
     /* Make local copy of bus state (won't change during output) */
     state_copy = current_bus_state & BUS_STATE_MASK;
     
-    /* Step 1: Pull LATCH low to enable shifting */
-    LATCH_PIN = 0;
-    
-    /* Step 2: Shift out 15 bits, MSB-first (bit 14 down to bit 0) */
+    /* Step 1: Shift out 15 bits, MSB-first (bit 14 down to bit 0) */
+    /* Data is clocked into 74HC595 shift register on SRCLK rising edge */
     for (bit_pos = (HAMMING_N - 1); bit_pos >= 0; bit_pos--)
     {
-        /* 2a. Set DATA_PIN to current bit value */
-        DATA_PIN = (uint8_t)((state_copy >> bit_pos) & 0x0001);
+        /* 1a. Set SER_PIN to current bit value */
+        SER_PIN = (uint8_t)((state_copy >> bit_pos) & 0x0001);
         
-        /* 2b. CLK high pulse */
-        CLK_PIN = 1;
-        CLK_DELAY_NOPS();  /* ~450 ns delay for ~1 MHz CLK */
+        /* Small setup time for data before clock edge (tsu = 25ns min @ 4.5V) */
+        _nop_(); _nop_();
         
-        /* 2c. CLK low */
-        CLK_PIN = 0;
-        CLK_DELAY_NOPS();  /* ~450 ns delay */
+        /* 1b. SRCLK rising edge - data shifts in */
+        SRCLK_PIN = 1;
+        CLK_DELAY_NOPS();  /* ~5 µs high time for 100 kHz CLK */
+        
+        /* 1c. SRCLK falling edge */
+        SRCLK_PIN = 0;
+        CLK_DELAY_NOPS();  /* ~5 µs low time */
     }
     
-    /* Step 3: Pulse LATCH high to transfer to outputs */
-    LATCH_PIN = 1;
-    CLK_DELAY_NOPS();  /* Short delay for latch setup */
+    /* Step 2: Pulse RCLK to transfer shift register to output latches */
+    /* 74HC595 latches data on RCLK rising edge */
     
-    /* Optional: Return LATCH to low (depends on shift register type)
-     * Most 74HC595-type registers latch on rising edge, so we can leave high.
-     * Uncomment the following line if your hardware needs it low after:
-     */
-    /* LATCH_PIN = 0; */
+    /* Small delay after last SRCLK before RCLK (tsu: SRCLK↑ before RCLK↑ = 19ns min @ 4.5V) */
+    _nop_(); _nop_(); _nop_();
+    
+    /* RCLK rising edge - transfers shift register to storage register */
+    RCLK_PIN = 1;
+    CLK_DELAY_NOPS();  /* Hold high for setup time */
+    
+    /* RCLK falling edge - prepare for next transfer */
+    RCLK_PIN = 0;
     
     /* === End Critical Section === */
     EA = saved_ea;  /* Restore interrupt state */
 }
 
 /* Port_Init
- * Initialize GPIO pins for shift register interface.
- * Sets DATA_PIN, CLK_PIN, LATCH_PIN as outputs with known initial states.
+ * Initialize GPIO pins for 74HC595 shift register interface.
+ * 
+ * Pin initialization:
+ *   SER_PIN (DATA)   - LOW (no data)
+ *   SRCLK_PIN (CLK)  - LOW (ready for rising edge)
+ *   RCLK_PIN (LATCH) - LOW (ready for rising edge)
+ *   SRCLR_PIN        - HIGH (normal operation, not clearing)
+ *   OE_PIN           - LOW (outputs enabled)
+ *
+ * Note: If SRCLR and OE are hardwired (SRCLR to VCC, OE to GND),
+ *       comment out those lines and free up the GPIO pins.
  */
 void Port_Init(void)
 {
-    /* Initialize shift register control pins to known low state */
-	
-    DATA_PIN  = 0;
-    CLK_PIN   = 0;
-    LATCH_PIN = 0;
+    /* Initialize shift register control pins */
+    SER_PIN   = 0;   /* Serial data input - idle low */
+    SRCLK_PIN = 0;   /* Shift register clock - idle low */
+    RCLK_PIN  = 0;   /* Storage register clock - idle low */
     
-    
+    /* 74HC595 control pins - can be hardwired if preferred:
+     *   SRCLR (pin 10) - Active LOW clear. Must be HIGH for normal operation.
+     *   OE (pin 13)    - Active LOW output enable. Must be LOW to enable outputs.
+     */
+    SRCLR_PIN = 1;   /* HIGH = shift register NOT cleared (normal operation) */
+    OE_PIN    = 0;   /* LOW = outputs enabled */
 }

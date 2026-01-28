@@ -14,12 +14,20 @@ typedef unsigned int  uint16_t;
 #define BUS_STATE_MASK  0x7FFF                  /* Mask for bits 0..14 */
 
 /* === 3. Shift Register Pin Definitions (User-Editable) ===
- * These are symbolic pin identifiers. Map them to actual port pins
- * in the implementation file based on your PCB schematic.
+ * Pin mapping for SN74HC595 shift registers.
+ * Directly matches 74HC595 signal names for clarity.
+ * Map them to actual port pins based on your PCB schematic.
  */
-sbit DATA_PIN  = P2^0;   /* Serial data output to shift registers */
-sbit CLK_PIN   = P2^1;   /* Clock pulse for shift registers */
-sbit LATCH_PIN = P2^2;   /* Latch pulse to update shift register outputs */
+sbit SER_PIN   = P2^0;   /* Serial data input (74HC595 pin 14) */
+sbit SRCLK_PIN = P2^1;   /* Shift register clock (74HC595 pin 11) - rising edge */
+sbit RCLK_PIN  = P2^2;   /* Storage register clock / Latch (74HC595 pin 12) - rising edge */
+sbit SRCLR_PIN = P2^3;   /* Shift register clear (74HC595 pin 10) - active LOW, keep HIGH */
+sbit OE_PIN    = P2^4;   /* Output enable (74HC595 pin 13) - active LOW, keep LOW */
+
+/* Legacy aliases for backward compatibility */
+#define DATA_PIN  SER_PIN
+#define CLK_PIN   SRCLK_PIN
+#define LATCH_PIN RCLK_PIN
 
 /* === 4. Global Variables (Externs) === */
 
@@ -81,11 +89,11 @@ uint8_t compute_syndrome_from_bus(uint16_t bus_state);
 uint16_t find_minimal_w(uint8_t s_target);
 
 /**
- * output_to_shift_registers - Bit-bang current_bus_state to chained shift registers
+ * output_to_shift_registers - Bit-bang current_bus_state to chained 74HC595 shift registers
  * 
  * Shift order: MSB-first (bit 14 down to bit 0).
- * Protocol: Set LATCH low -> shift 15 bits with CLK pulses -> pulse LATCH high.
- * CLK timing targets ~1 MHz with NOP-based delays.
+ * Protocol: For each bit, set SER then pulse SRCLK; finally pulse RCLK to latch.
+ * CLK timing targets ~100 kHz with NOP-based delays.
  */
 void output_to_shift_registers(void);
 
